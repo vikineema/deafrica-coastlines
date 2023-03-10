@@ -160,8 +160,7 @@ def continental_cli(
 
     # Output path for geopackage and zipped shapefiles
     OUTPUT_GPKG = output_dir / f"deafricacoastlines_{continental_version}.gpkg"
-    OUTPUT_SHPS = output_dir / \
-        f"deafricacoastlines_{continental_version}.shp.zip"
+    OUTPUT_SHPS = output_dir / f"deafricacoastlines_{continental_version}.shp.zip"
 
     # If shapefile zip exists, delete it first
     if OUTPUT_SHPS.exists():
@@ -263,8 +262,7 @@ def continental_cli(
             hotspot_values = hotspot_grouped.median().round(2)
 
             # Extract year from distance columns (remove "dist_")
-            x_years = hotspot_values.columns.str.replace(
-                "dist_", "").astype(int)
+            x_years = hotspot_values.columns.str.replace("dist_", "").astype(int)
 
             # Compute coastal change rates by linearly regressing annual
             # movements vs. time
@@ -282,8 +280,7 @@ def continental_cli(
 
             # Join aggregated values back to hotspot points after
             # dropping unused columns (regression intercept)
-            hotspots_gdf = hotspots_gdf.join(
-                hotspot_values.drop("incpt_time", axis=1))
+            hotspots_gdf = hotspots_gdf.join(hotspot_values.drop("incpt_time", axis=1))
 
             # Add hotspots radius attribute column
             hotspots_gdf["radius_m"] = radius

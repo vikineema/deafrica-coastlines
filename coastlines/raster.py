@@ -946,8 +946,7 @@ def tidal_composite(
             )
 
     # Set coordinate and dim
-    median_ds = median_ds.assign_coords(
-        **{label_dim: label}).expand_dims(label_dim)
+    median_ds = median_ds.assign_coords(**{label_dim: label}).expand_dims(label_dim)
 
     return median_ds
 
@@ -1011,8 +1010,7 @@ def export_annual_gapfill(ds, output_dir, tide_cutoff_min, tide_cutoff_max):
         if previous_ds and current_ds and future_ds:
 
             # Concatenate the three years into one xarray.Dataset
-            gapfill_ds = xr.concat(
-                [previous_ds, current_ds, future_ds], dim="time")
+            gapfill_ds = xr.concat([previous_ds, current_ds, future_ds], dim="time")
 
             # Generate composite
             tidal_composite(
@@ -1096,16 +1094,14 @@ def generate_rasters(
     # Add  this new data as a new variable in our satellite dataset to allow
     # each satellite pixel to be analysed and filtered/masked based on the
     # tide height at the exact moment of satellite image acquisition.
-    ds["tide_m"], tides_lowres = pixel_tides(
-        ds, resample=True, directory="/var/share")
+    ds["tide_m"], tides_lowres = pixel_tides(ds, resample=True, directory="/var/share")
     log.info(f"Study area {study_area}: Finished modelling tide heights")
 
     # Based on the entire time-series of tide heights, compute the max
     # and min satellite-observed tide height for each pixel, then
     # calculate tide cutoffs used to restrict our data to satellite
     # observations centred over mid-tide (0 m Above Mean Sea Level).
-    tide_cutoff_min, tide_cutoff_max = tide_cutoffs(
-        ds, tides_lowres, tide_centre=0.0)
+    tide_cutoff_min, tide_cutoff_max = tide_cutoffs(ds, tides_lowres, tide_centre=0.0)
     log.info(
         f"Study area {study_area}: Calculating low and high tide cutoffs for each pixel"
     )
@@ -1206,8 +1202,7 @@ def generate_rasters_cli(
     aws_unsigned,
     overwrite,
 ):
-    log = configure_logging(
-        f"Coastlines raster generation for study area {study_area}")
+    log = configure_logging(f"Coastlines raster generation for study area {study_area}")
 
     # Test if study area has already been run by checking if final raster exists
     output_exists = os.path.exists(
@@ -1235,8 +1230,7 @@ def generate_rasters_cli(
             dc, config, study_area, raster_version, start_year, end_year, log=log,
         )
     except Exception as e:
-        log.exception(
-            f"Study area {study_area}: Failed to run process with error {e}")
+        log.exception(f"Study area {study_area}: Failed to run process with error {e}")
         sys.exit(1)
 
 

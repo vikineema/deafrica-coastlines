@@ -117,12 +117,10 @@ def load_rasters(
                 )
 
             # Create variable used for time axis
-            time_var = xr.Variable(
-                "year", [int(i.split("/")[-1][0:4]) for i in paths])
+            time_var = xr.Variable("year", [int(i.split("/")[-1][0:4]) for i in paths])
 
             # Import data
-            layer_da = xr.concat([xr.open_rasterio(i)
-                                 for i in paths], dim=time_var)
+            layer_da = xr.concat([xr.open_rasterio(i) for i in paths], dim=time_var)
             layer_da.name = f"{layer_name}"
 
             # Append to file
@@ -187,8 +185,7 @@ def ocean_masking(ds, tide_points_gdf, connectivity=1, dilation=None):
     # of each shoreline to ensure contour extraction accurately
     # seperates land and water spectra
     if dilation:
-        ocean_mask = xr.apply_ufunc(
-            binary_dilation, ocean_mask, disk(dilation))
+        ocean_mask = xr.apply_ufunc(binary_dilation, ocean_mask, disk(dilation))
 
     return ocean_mask
 
@@ -273,8 +270,7 @@ def temporal_masking(ds):
 
         # For each blob of land, obtain whether it intersected with land in
         # any neighbouring timestep
-        region_props = regionprops(
-            labels.values, intensity_image=intensity.values)
+        region_props = regionprops(labels.values, intensity_image=intensity.values)
         contiguous = [i.label for i in region_props if i.max_intensity == 0]
 
         # Filter array to only contiguous land
@@ -521,8 +517,7 @@ def contours_preprocess(
         landcover = datacube.Datacube().load(
             product="esa_worldcover", like=yearly_ds.geobox
         )
-        landcover_water = landcover.classification.isin(
-            [0, 80]).squeeze(dim="time")
+        landcover_water = landcover.classification.isin([0, 80]).squeeze(dim="time")
         landcover_mask = ~odc.algo.mask_cleanup(
             landcover_water, mask_filters=[("erosion", buffer_pixels)]
         )
@@ -583,8 +578,7 @@ def contours_preprocess(
 
             # Convert type column to integer, with 1 representing pixels to add
             # to the coastal mask, and 2 representing pixels to remove from the mask
-            mask_modifications = mask_modifications.replace(
-                {"add": 1, "remove": 2})
+            mask_modifications = mask_modifications.replace({"add": 1, "remove": 2})
 
             # Rasterise polygons into extent of satellite data
             modifications_da = xr_rasterize(
@@ -592,8 +586,7 @@ def contours_preprocess(
             )
 
             # Apply modifications to mask
-            coastal_mask = coastal_mask.where(
-                modifications_da == 0, modifications_da)
+            coastal_mask = coastal_mask.where(modifications_da == 0, modifications_da)
 
     # Because the output of `coastal_masking` contains values of 2 that
     # represent pixels inland of the coastal buffer and values of 1 in
@@ -748,8 +741,7 @@ def annual_movements(
 
         # Set any value over X m to NaN, and drop any points with
         # less than 50% valid observations
-        points_gdf[f"dist_{comp_year}"] = distances.where(
-            distances < max_valid_dist)
+        points_gdf[f"dist_{comp_year}"] = distances.where(distances < max_valid_dist)
 
         # Extract comparison array containing water index values for the
         # current year being analysed
@@ -771,8 +763,7 @@ def annual_movements(
 
         # Ensure NaNs are correctly propagated (otherwise, X > NaN
         # will return False, resulting in an incorrect land-ward direction)
-        is_nan = points_gdf[["index_comp_p1",
-                             "index_baseline_p2"]].isna().any(axis=1)
+        is_nan = points_gdf[["index_comp_p1", "index_baseline_p2"]].isna().any(axis=1)
         points_gdf["loss_gain"] = points_gdf["loss_gain"].where(~is_nan)
 
         # Multiply distance to set change to negative, positive or NaN
@@ -1274,8 +1265,7 @@ def region_atttributes(gdf, region_gdf, attribute_col="TERRITORY1", rename_col=F
 
     # Spatial join region data to points
     if gdf.iloc[0].geometry.type == "Point":
-        joined_df = gdf.sjoin(region_subset, how="left").drop(
-            "index_right", axis=1)
+        joined_df = gdf.sjoin(region_subset, how="left").drop("index_right", axis=1)
 
     # Or if data is not points, use overlay (overlay removes index on
     # gdf1, so we need to reset to keep it as a columnm, then reapply)
@@ -1464,8 +1454,7 @@ def generate_vectors(
     # Extract statistics modelling points along baseline shoreline
     try:
 
-        points_gdf = points_on_line(
-            contours_gdf, str(baseline_year), distance=30)
+        points_gdf = points_on_line(contours_gdf, str(baseline_year), distance=30)
         log.info(f"Study area {study_area}: Extracted rates of change points")
 
     except KeyError:
@@ -1494,13 +1483,11 @@ def generate_vectors(
 
         # Calculate regressions
         points_gdf = calculate_regressions(points_gdf, contours_gdf)
-        log.info(
-            f"Study area {study_area}: Calculated rates of change regressions")
+        log.info(f"Study area {study_area}: Calculated rates of change regressions")
 
         # Add count and span of valid obs, Shoreline Change Envelope
         # (SCE), Net Shoreline Movement (NSM) and Max/Min years
-        stats_list = ["valid_obs", "valid_span",
-                      "sce", "nsm", "max_year", "min_year"]
+        stats_list = ["valid_obs", "valid_span", "sce", "nsm", "max_year", "min_year"]
         points_gdf[stats_list] = points_gdf.apply(
             lambda x: all_time_stats(x, initial_year=start_year), axis=1
         )
@@ -1555,8 +1542,7 @@ def generate_vectors(
         )
         points_gdf = points_gdf.set_index(uids)
 
-        log.info(
-            f"Study area {study_area}: Added region attributes and geohash UIDs")
+        log.info(f"Study area {study_area}: Added region attributes and geohash UIDs")
 
         ################
         # Export stats #
@@ -1565,8 +1551,7 @@ def generate_vectors(
         if points_gdf is not None and len(points_gdf) > 0:
 
             # Clip stats to study area extent
-            points_gdf = points_gdf[points_gdf.intersects(
-                gridcell_gdf.geometry.item())]
+            points_gdf = points_gdf[points_gdf.intersects(gridcell_gdf.geometry.item())]
 
             # Set output path
             stats_path = (
@@ -1582,8 +1567,7 @@ def generate_vectors(
             # Export as ESRI shapefiles
             points_gdf.to_file(
                 f"{stats_path}.shp",
-                schema={"properties": vector_schema(
-                    points_gdf), "geometry": "Point", },
+                schema={"properties": vector_schema(points_gdf), "geometry": "Point",},
             )
 
         else:
@@ -1619,8 +1603,7 @@ def generate_vectors(
     )
 
     # Clip annual shoreline contours to study area extent
-    contours_gdf["geometry"] = contours_gdf.intersection(
-        gridcell_gdf.geometry.item())
+    contours_gdf["geometry"] = contours_gdf.intersection(gridcell_gdf.geometry.item())
 
     # Export to GeoJSON
     contours_gdf.to_crs("EPSG:4326").to_file(
@@ -1636,8 +1619,7 @@ def generate_vectors(
         },
     )
 
-    log.info(
-        f"Study area {study_area}: Output vector files written to {output_dir}")
+    log.info(f"Study area {study_area}: Output vector files written to {output_dir}")
 
 
 @click.command()
@@ -1736,8 +1718,7 @@ def generate_vectors_cli(
     overwrite,
 ):
 
-    log = configure_logging(
-        f"Coastlines vector generation for study area {study_area}")
+    log = configure_logging(f"Coastlines vector generation for study area {study_area}")
 
     # Test if study area has already been run by checking if shoreline data exists
     output_exists = os.path.exists(
@@ -1769,8 +1750,7 @@ def generate_vectors_cli(
             log=log,
         )
     except Exception as e:
-        log.exception(
-            f"Study area {study_area}: Failed to run process with error {e}")
+        log.exception(f"Study area {study_area}: Failed to run process with error {e}")
         sys.exit(1)
 
 
