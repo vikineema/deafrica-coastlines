@@ -1272,10 +1272,7 @@ def region_atttributes(gdf, region_gdf, attribute_col="TERRITORY1", rename_col=F
     # gdf1, so we need to reset to keep it as a columnm, then reapply)
     else:
         joined_df = gpd.overlay(
-            gdf.reset_index(),
-            region_subset,
-            how="union",
-            keep_geom_type=True,
+            gdf.reset_index(), region_subset, how="union", keep_geom_type=True,
         ).set_index(gdf.index.name)
 
     return joined_df
@@ -1523,8 +1520,7 @@ def generate_vectors(
             "Comores",
         ]
         points_gdf.loc[
-            points_gdf.country.isin(offshore_island_nations),
-            "certainty",
+            points_gdf.country.isin(offshore_island_nations), "certainty",
         ] = "offshore islands"
         points_gdf.loc[
             rocky_shoreline_flag(points_gdf, geomorphology_gdf), "certainty"
@@ -1566,17 +1562,13 @@ def generate_vectors(
 
             # Export to GeoJSON
             points_gdf.to_crs("EPSG:4326").to_file(
-                f"{stats_path}.geojson",
-                driver="GeoJSON",
+                f"{stats_path}.geojson", driver="GeoJSON",
             )
 
             # Export as ESRI shapefiles
             points_gdf.to_file(
                 f"{stats_path}.shp",
-                schema={
-                    "properties": vector_schema(points_gdf),
-                    "geometry": "Point",
-                },
+                schema={"properties": vector_schema(points_gdf), "geometry": "Point",},
             )
 
         else:

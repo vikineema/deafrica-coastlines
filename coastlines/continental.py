@@ -242,9 +242,7 @@ def continental_cli(
             # Extract hotspot points
             log.info(f"Calculating {radius} m hotspots")
             hotspots_gdf = points_on_line(
-                shorelines_gdf,
-                index=baseline_year,
-                distance=int(radius / 2),
+                shorelines_gdf, index=baseline_year, distance=int(radius / 2),
             )
 
             # Create polygon windows by buffering points

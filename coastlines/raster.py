@@ -1229,13 +1229,7 @@ def generate_rasters_cli(
 
     try:
         generate_rasters(
-            dc,
-            config,
-            study_area,
-            raster_version,
-            start_year,
-            end_year,
-            log=log,
+            dc, config, study_area, raster_version, start_year, end_year, log=log,
         )
     except Exception as e:
         log.exception(f"Study area {study_area}: Failed to run process with error {e}")
