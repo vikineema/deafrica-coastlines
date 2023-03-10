@@ -94,12 +94,10 @@ def load_rasters(
     ds_list = []
 
     for layer_type in [".tif", "_gapfill.tif"]:
-
         # List to hold output DataArrays
         da_list = []
 
         for layer_name in [f"{water_index}", "ndwi", "tide_m", "count", "stdev"]:
-
             # Get paths of files that match pattern
             paths = glob.glob(
                 f"{path}/{raster_version}/"
@@ -267,7 +265,6 @@ def temporal_masking(ds):
     """
 
     def _noncontiguous(labels, intensity):
-
         # For each blob of land, obtain whether it intersected with land in
         # any neighbouring timestep
         region_props = regionprops(labels.values, intensity_image=intensity.values)
@@ -510,7 +507,6 @@ def contours_preprocess(
     temporal_mask = True
 
     if mask_landcover:
-
         # To remove aerosol-based noise over open water, apply a mask based
         # on the ESA World Cover dataset, loading persistent water
         # then shrinking this to ensure only deep water pixels are included
@@ -526,7 +522,6 @@ def contours_preprocess(
         thresholded_ds = thresholded_ds.where(landcover_mask, 0)
 
     if mask_ndwi:
-
         # To remove remaining aerosol-based noise over open water, apply an additional
         # mask based on NDWI. This works because NIR is less affected by the aerosol
         # issues than SWIR, and NDWI tends to be less aggressive at mapping
@@ -543,7 +538,6 @@ def contours_preprocess(
         thresholded_ds = thresholded_ds.where(ndwi_mask, 0)
 
     if mask_temporal:
-
         # Create a temporal mask by identifying land pixels with a direct
         # spatial connection (e.g. contiguous) to land pixels in either the
         # previous or subsequent timestep.
@@ -572,10 +566,8 @@ def contours_preprocess(
     # Optionally modify the coastal mask using manually supplied polygons to
     # add missing areas of shoreline, or remove unwanted areas from the mask.
     if mask_modifications is not None:
-
         # Only proceed if there are polygons available
         if len(mask_modifications.index) > 0:
-
             # Convert type column to integer, with 1 representing pixels to add
             # to the coastal mask, and 2 representing pixels to remove from the mask
             mask_modifications = mask_modifications.replace({"add": 1, "remove": 2})
@@ -724,7 +716,6 @@ def annual_movements(
 
     # Iterate through all comparison years in contour gdf
     for comp_year in years:
-
         # Set comparison contour
         comp_contour = contours_gdf.loc[[comp_year]].geometry.iloc[0]
 
@@ -1142,7 +1133,6 @@ def contour_certainty(contours_gdf, certainty_masks):
     # Loop through each annual shoreline and attribute data with certainty
     out_list = []
     for year, _ in contours_gdf.iterrows():
-
         # Extract year
         contour_gdf = contours_gdf.loc[[year]]
 
@@ -1271,7 +1261,10 @@ def region_atttributes(gdf, region_gdf, attribute_col="TERRITORY1", rename_col=F
     # gdf1, so we need to reset to keep it as a columnm, then reapply)
     else:
         joined_df = gpd.overlay(
-            gdf.reset_index(), region_subset, how="union", keep_geom_type=True,
+            gdf.reset_index(),
+            region_subset,
+            how="union",
+            keep_geom_type=True,
         ).set_index(gdf.index.name)
 
     return joined_df
@@ -1453,12 +1446,10 @@ def generate_vectors(
 
     # Extract statistics modelling points along baseline shoreline
     try:
-
         points_gdf = points_on_line(contours_gdf, str(baseline_year), distance=30)
         log.info(f"Study area {study_area}: Extracted rates of change points")
 
     except KeyError:
-
         log.warning(
             f"Study area {study_area}: One or more years missing, so no statistics points were generated"
         )
@@ -1466,7 +1457,6 @@ def generate_vectors(
 
     # If any points exist in the dataset
     if points_gdf is not None and len(points_gdf) > 0:
-
         # Calculate annual coastline movements and residual tide heights
         # for every contour compared to the baseline year
         points_gdf = annual_movements(
@@ -1519,7 +1509,8 @@ def generate_vectors(
             "Comores",
         ]
         points_gdf.loc[
-            points_gdf.country.isin(offshore_island_nations), "certainty",
+            points_gdf.country.isin(offshore_island_nations),
+            "certainty",
         ] = "offshore islands"
         points_gdf.loc[
             rocky_shoreline_flag(points_gdf, geomorphology_gdf), "certainty"
@@ -1549,7 +1540,6 @@ def generate_vectors(
         ################
 
         if points_gdf is not None and len(points_gdf) > 0:
-
             # Clip stats to study area extent
             points_gdf = points_gdf[points_gdf.intersects(gridcell_gdf.geometry.item())]
 
@@ -1561,13 +1551,17 @@ def generate_vectors(
 
             # Export to GeoJSON
             points_gdf.to_crs("EPSG:4326").to_file(
-                f"{stats_path}.geojson", driver="GeoJSON",
+                f"{stats_path}.geojson",
+                driver="GeoJSON",
             )
 
             # Export as ESRI shapefiles
             points_gdf.to_file(
                 f"{stats_path}.shp",
-                schema={"properties": vector_schema(points_gdf), "geometry": "Point",},
+                schema={
+                    "properties": vector_schema(points_gdf),
+                    "geometry": "Point",
+                },
             )
 
         else:
@@ -1717,7 +1711,6 @@ def generate_vectors_cli(
     baseline_year,
     overwrite,
 ):
-
     log = configure_logging(f"Coastlines vector generation for study area {study_area}")
 
     # Test if study area has already been run by checking if shoreline data exists
