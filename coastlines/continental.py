@@ -13,7 +13,6 @@
 
 import os
 import sys
-
 import fiona
 import click
 import numpy as np
@@ -21,7 +20,6 @@ import pandas as pd
 import geohash as gh
 import geopandas as gpd
 from pathlib import Path
-
 from coastlines.utils import configure_logging, STYLES_FILE
 from coastlines.vector import points_on_line, change_regress, vector_schema
 
@@ -137,7 +135,6 @@ def continental_cli(
     baseline_year,
     include_styles,
 ):
-
     #################
     # Merge vectors #
     #################
@@ -170,7 +167,6 @@ def continental_cli(
 
     # Combine annual shorelines into a single continental layer
     if shorelines:
-
         os.system(
             f"ogrmerge.py -o "
             f"{OUTPUT_GPKG} {shoreline_paths} "
@@ -184,7 +180,6 @@ def continental_cli(
 
     # Combine rates of change stats points into single continental layer
     if ratesofchange:
-
         os.system(
             f"ogrmerge.py "
             f"-o {OUTPUT_GPKG} {ratesofchange_paths} "
@@ -203,7 +198,6 @@ def continental_cli(
     # Generate hotspot points that provide regional/continental summary
     # of hotspots of coastal erosion and growth
     if hotspots:
-
         ###############################
         # Load DEA CoastLines vectors #
         ###############################
@@ -212,7 +206,6 @@ def continental_cli(
 
         # Load continental shoreline and rates of change data
         try:
-
             # Load continental rates of change data
             ratesofchange_gdf = gpd.read_file(
                 OUTPUT_GPKG, layer="rates_of_change"
@@ -225,7 +218,6 @@ def continental_cli(
             shorelines_gdf = shorelines_gdf.loc[shorelines_gdf.geometry.is_valid]
 
         except (fiona.errors.DriverError, ValueError):
-
             raise FileNotFoundError(
                 "Continental-scale annual shoreline and rates of "
                 "change layers are required for hotspot generation. "
@@ -238,7 +230,6 @@ def continental_cli(
         ######################
 
         for i, radius in enumerate(hotspots_radius):
-
             # Extract hotspot points
             log.info(f"Calculating {radius} m hotspots")
             hotspots_gdf = points_on_line(
@@ -311,7 +302,6 @@ def continental_cli(
 
             # Export hotspots to file, incrementing name for each layer
             try:
-
                 # Export to geopackage
                 layer_name = f"hotspots_zoom_{range(0, 10)[i + 1]}"
                 hotspots_gdf.to_file(
@@ -337,14 +327,12 @@ def continental_cli(
                 )
 
             except ValueError as e:
-
                 log.exception(f"Failed to generate hotspots with error: {e}")
                 sys.exit(1)
 
         log.info("Writing hotspots complete")
 
     else:
-
         log.info("Not writing hotspots...")
 
     ############################
@@ -352,7 +340,6 @@ def continental_cli(
     ############################
 
     if ratesofchange:
-
         # Add rates of change points to shapefile zip
         # Add additional WMS fields and add to shapefile
         ratesofchange_gdf = pd.concat(
@@ -371,7 +358,6 @@ def continental_cli(
         log.info("Writing rates of change points to zipped shapefiles complete")
 
     if shorelines:
-
         # Add annual shorelines to shapefile zip
         shorelines_gdf.to_file(
             OUTPUT_SHPS,
@@ -389,13 +375,11 @@ def continental_cli(
     #########################
 
     if include_styles:
-
         styles = gpd.read_file(STYLES_FILE)
         styles.to_file(OUTPUT_GPKG, layer="layer_styles")
         log.info("Writing styles to GeoPackage file complete")
 
     else:
-
         log.info("Not writing styles to GeoPackage")
 
 

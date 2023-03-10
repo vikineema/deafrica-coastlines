@@ -24,7 +24,6 @@ import warnings
 import multiprocessing
 from functools import partial
 from collections import Counter
-
 import pytz
 import dask
 import click
@@ -34,7 +33,6 @@ import xarray as xr
 import geopandas as gpd
 from affine import Affine
 from shapely.geometry import shape
-
 import datacube
 import odc.algo
 import odc.geo.xr
@@ -310,7 +308,6 @@ def load_water_index(
     with mock.patch(
         "datacube.virtual.impl.native_geobox", side_effect=custom_native_geobox
     ):
-
         # Identify most common CRS
         bag = product.query(dc, **query)
         crs_list = [str(i.crs) for i in bag.contained_datasets()]
@@ -985,7 +982,6 @@ def export_annual_gapfill(ds, output_dir, tide_cutoff_min, tide_cutoff_max):
 
     # Iterate through each year in the dataset, starting at one year before
     for year in np.unique(ds.time.dt.year) - 1:
-
         # Load data for the subsequent year
         future_ds = load_tidal_subset(
             ds.sel(time=str(year + 1)),
@@ -996,7 +992,6 @@ def export_annual_gapfill(ds, output_dir, tide_cutoff_min, tide_cutoff_max):
         # If the current year var contains data, combine these observations
         # into median annual high tide composites and export GeoTIFFs
         if current_ds:
-
             # Generate composite
             tidal_composite(
                 current_ds,
@@ -1010,7 +1005,6 @@ def export_annual_gapfill(ds, output_dir, tide_cutoff_min, tide_cutoff_max):
         # combine these three years of observations into a single median
         # 3-year gapfill composite
         if previous_ds and current_ds and future_ds:
-
             # Concatenate the three years into one xarray.Dataset
             gapfill_ds = xr.concat([previous_ds, current_ds, future_ds], dim="time")
 

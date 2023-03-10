@@ -17,16 +17,16 @@
                     -17.529918743821995,
                     -34.832866046097855,
                     51.34923359460542,
-                    37.34408308455104,
+                    37.34408308455104
                 ]
             ]
-        },
+        }
     },
     "links": [
         {
             "rel": "items",
-            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/main/metadata/coastlines_stac_item.json",
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/main/metadata/coastlines_stac_item.json"
         },
-        {"rel": "root", "href": "https://explorer.dev.digitalearth.africa/stac"},
-    ],
+        {"rel": "root", "href": "https://explorer.dev.digitalearth.africa/stac"}
+    ]
 }
