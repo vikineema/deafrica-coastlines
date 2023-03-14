@@ -45,16 +45,16 @@
         },
         {
             "rel": "self",
-            "href": "s3://deafrica-services/coastlines/v0.4.0/deafricacoastlines_v0.4.0.shp.zip",
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/stac_update/metadata/coastlines_stac_item.json",
             "type": "application/json"
         },
         {
             "rel": "collection",
-            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/main/metadata/coastlines_stac_collection.json"
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/stac_update/metadata/coastlines_stac_collection.json"
         },
         {
             "rel": "root",
-            "href": "https://raw.githubusercontent.com/Indiphile/stac_catalog_browse_test/master/catalog.json"
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/stac_update/metadata/coastlines_stac_catalog.json"
         }
     ],
     "assets": {

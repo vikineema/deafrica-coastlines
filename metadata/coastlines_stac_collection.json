@@ -9,7 +9,12 @@
     "providers": [],
     "extent": {
         "temporal": {
-            "interval": [["2001-01-01T00:00+00:00", "2021-01-01T00:00+00:00"]]
+            "interval": [
+                [
+                    "2001-01-01T00:00+00:00",
+                    "2021-01-01T00:00+00:00"
+                ]
+            ]
         },
         "spatial": {
             "bbox": [
@@ -24,9 +29,12 @@
     },
     "links": [
         {
-            "rel": "items",
-            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/main/metadata/coastlines_stac_item.json"
+            "rel": "item",
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/stac_update/metadata/coastlines_stac_item.json"
         },
-        {"rel": "root", "href": "https://explorer.dev.digitalearth.africa/stac"}
+        {
+            "rel": "root",
+            "href": "https://raw.githubusercontent.com/digitalearthafrica/deafrica-coastlines/stac_update/metadata/coastlines_stac_catalog.json"
+        }
     ]
 }
