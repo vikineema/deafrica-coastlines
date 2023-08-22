@@ -511,7 +511,7 @@ def contours_preprocess(
         # on the ESA World Cover dataset, loading persistent water
         # then shrinking this to ensure only deep water pixels are included
         landcover = datacube.Datacube().load(
-            product="esa_worldcover", like=yearly_ds.geobox
+            product="esa_worldcover_2020", like=yearly_ds.geobox
         )
         landcover_water = landcover.classification.isin([0, 80]).squeeze(dim="time")
         landcover_mask = ~odc.algo.mask_cleanup(
