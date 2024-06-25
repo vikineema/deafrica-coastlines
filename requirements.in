@@ -5,6 +5,7 @@ botocore
 click>=8.0.1
 datacube[s3,performance]>=1.8.6
 dea_tools>=0.2.8.dev12
+deafrica_tools>=2.4.0
 Fiona>=1.8.20
 geopandas>=0.10.2
 matplotlib>=3.4.3
@@ -26,3 +27,5 @@ scipy>=1.7.3
 Shapely>=1.8rc1
 tqdm>=4.62.3
 xarray>=0.19.0
+# To match osgeo/gdal:ubuntu-small-3.6.3 in Dockerfile
+gdal==3.6.3
