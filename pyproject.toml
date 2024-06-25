@@ -58,9 +58,6 @@ deafricacoastlines-continental = "coastlines.continental:continental_cli"
 [tool.setuptools]
 packages = ["coastlines"]
 
-[tool.setuptools.dynamic]
-version = {attr = "coastlines._version.__version__"}
-
 [tool.setuptools_scm]
 write_to = "coastlines/_version.py"
 
