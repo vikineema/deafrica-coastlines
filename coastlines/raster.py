@@ -18,133 +18,42 @@
 #       at approximately mean sea level tide height each year (0 metres
 #       Above Mean Sea Level).
 
+import multiprocessing
 import os
 import sys
 import warnings
-import multiprocessing
-from functools import partial
 from collections import Counter
-import pytz
-import dask
+from functools import partial
+
 import click
-import numpy as np
-import pandas as pd
-import xarray as xr
-import geopandas as gpd
-from affine import Affine
-from shapely.geometry import shape
+import dask
 import datacube
+import geopandas as gpd
+import mock
+import numpy as np
 import odc.algo
 import odc.geo.xr
+import pandas as pd
+import pytz
+import xarray as xr
+from affine import Affine
 from datacube.utils.aws import configure_s3_access
 from datacube.utils.cog import write_cog
 from datacube.utils.geometry import CRS, GeoBox, Geometry
 from datacube.utils.masking import make_mask
 from datacube.virtual import catalog_from_file
-
-from dea_tools.dask import create_local_dask_cluster
-from dea_tools.spatial import interpolate_2d, hillshade, sun_angles
-from dea_tools.coastal import model_tides, pixel_tides
-from dea_tools.datahandling import parallel_apply
+from dea_tools.spatial import hillshade
+from deafrica_tools.coastal import model_tides, pixel_tides
+from deafrica_tools.dask import create_local_dask_cluster
+from deafrica_tools.datahandling import parallel_apply
+from deafrica_tools.spatial import interpolate_2d, sun_angles
+from shapely.geometry import shape
+from skimage.morphology import binary_dilation, binary_opening, disk
 
 from coastlines.utils import configure_logging, load_config
 
 # Hide warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
-
-# def hillshade(dem, elevation, azimuth, vert_exag=1, dx=30, dy=30):
-#     """
-#     Calculate hillshade from an input Digital Elevation Model
-#     (DEM) array and a sun elevation and azimith.
-
-#     Parameters:
-#     -----------
-#     dem : numpy.array
-#         A 2D Digital Elevation Model array.
-#     elevation : int or float
-#         Sun elevation (0-90, degrees up from horizontal).
-#     azimith : int or float
-#         Sun azimuth (0-360, degrees clockwise from north).
-#     vert_exag : int or float, optional
-#         The amount to exaggerate the elevation values by
-#         when calculating illumination. This can be used either
-#         to correct for differences in units between the x-y coordinate
-#         system and the elevation coordinate system (e.g. decimal
-#         degrees vs. meters) or to exaggerate or de-emphasize
-#         topographic effects.
-#     dx : int or float, optional
-#         The x-spacing (columns) of the input DEM. This
-#         is typically the spatial resolution of the DEM.
-#     dy : int or float, optional
-#         The y-spacing (rows) of the input input DEM. This
-#         is typically the spatial resolution of the DEM.
-
-#     Returns:
-#     --------
-#     hs : numpy.array
-#         A 2D hillshade array with values between 0-1, where
-#         0 is completely in shadow and 1 is completely
-#         illuminated.
-#     """
-
-#     from matplotlib.colors import LightSource
-
-#     hs = LightSource(azdeg=azimuth, altdeg=elevation).hillshade(
-#         dem, vert_exag=vert_exag, dx=dx, dy=dy
-#     )
-#     return hs
-
-
-# def sun_angles(dc, query):
-#     """
-#     For a given spatiotemporal query, calculate mean sun
-#     azimuth and elevation for each satellite observation, and
-#     return these as a new `xarray.Dataset` with 'sun_elevation'
-#     and 'sun_azimuth' variables.
-
-#     Parameters:
-#     -----------
-#     dc : datacube.Datacube object
-#         Datacube instance used to load data.
-#     query : dict
-#         A dictionary containing query parameters used to identify
-#         satellite observations and load metadata.
-
-#     Returns:
-#     --------
-#     sun_angles_ds : xarray.Dataset
-#         An `xarray.set` containing a 'sun_elevation' and
-#         'sun_azimuth' variables.
-#     """
-
-#     from datacube.api.query import query_group_by
-#     from datacube.model.utils import xr_apply
-
-#     # Identify satellite datasets and group outputs using the
-#     # same approach used to group satellite imagery (i.e. solar day)
-#     gb = query_group_by(**query)
-#     datasets = dc.find_datasets(**query)
-#     dataset_array = dc.group_datasets(datasets, gb)
-
-#     # Load and take the mean of metadata from each product
-#     sun_azimuth = xr_apply(
-#         dataset_array,
-#         lambda t, dd: np.mean([d.metadata.eo_sun_azimuth for d in dd]),
-#         dtype=float,
-#     )
-#     sun_elevation = xr_apply(
-#         dataset_array,
-#         lambda t, dd: np.mean([d.metadata.eo_sun_elevation for d in dd]),
-#         dtype=float,
-#     )
-
-#     # Combine into new xarray.Dataset
-#     sun_angles_ds = xr.merge(
-#         [sun_elevation.rename("sun_elevation"), sun_azimuth.rename("sun_azimuth")]
-#     )
-
-#     return sun_angles_ds
 
 
 def terrain_shadow(ds, dem, threshold=0.5, radius=1):
@@ -178,9 +87,6 @@ def terrain_shadow(ds, dem, threshold=0.5, radius=1):
         An `xarray.DataArray` containing boolean True values where
         a pixel contains terrain shadow, and False if not.
     """
-
-    from skimage.morphology import binary_dilation, binary_opening, disk
-
     hs = hillshade(dem, ds.sun_elevation, ds.sun_azimuth)
     hs = hs < threshold
     hs = binary_opening(hs, disk(radius))
@@ -245,9 +151,7 @@ def terrain_shadow_masking(dc, query, ds, dem_product="dem_cop_30"):
     return ds.where(~terrain_shadow_ds)
 
 
-def load_water_index(
-    dc, query, yaml_path, product_name="ls_nbart_mndwi", mask_terrain_shadow=True
-):
+def load_water_index(dc, query, yaml_path, product_name="ls_nbart_mndwi", mask_terrain_shadow=True):
     """
     This function uses virtual products to load Landsat 5, 7, 8 and 9 data,
     calculate a custom remote sensing index, and return the data as a
@@ -282,7 +186,6 @@ def load_water_index(
         An `xarray.Dataset` containing a time series of water index
         data (e.g. MNDWI) for the provided datacube query
     """
-    import mock
 
     def custom_native_geobox(ds, measurements=None, basis=None):
         """
@@ -305,9 +208,7 @@ def load_water_index(
     # Determine geobox with custom function to increase lazy loading
     # speed (will eventually be done automatically within virtual
     # products)
-    with mock.patch(
-        "datacube.virtual.impl.native_geobox", side_effect=custom_native_geobox
-    ):
+    with mock.patch("datacube.virtual.impl.native_geobox", side_effect=custom_native_geobox):
         # Identify most common CRS
         bag = product.query(dc, **query)
         crs_list = [str(i.crs) for i in bag.contained_datasets()]
@@ -339,9 +240,7 @@ def load_water_index(
 
     # Apply opening to remove long narrow false positive clouds along
     # the coastline, then dilate to restore cloud edges
-    mask_cleaned = odc.algo.mask_cleanup(
-        mask, mask_filters=[("opening", 20), ("dilation", 5)]
-    )
+    mask_cleaned = odc.algo.mask_cleanup(mask, mask_filters=[("opening", 20), ("dilation", 5)])
     ds = ds.where(~mask_cleaned & ~nodata)
 
     # Mask any invalid pixel values outside of 0 and 1
@@ -359,401 +258,6 @@ def load_water_index(
         ds = terrain_shadow_masking(dc, query, ds, dem_product="dem_cop_30")
 
     return ds[["mndwi", "ndwi"]]
-
-
-# def model_tides(
-#     x,
-#     y,
-#     time,
-#     model="FES2014",
-#     directory="tide_models",
-#     epsg=4326,
-#     method="bilinear",
-#     extrapolate=True,
-#     cutoff=10.0,
-# ):
-#     """
-#     Compute tides at points and times using tidal harmonics.
-#     If multiple x, y points are provided, tides will be
-#     computed for all timesteps at each point.
-
-#     This function supports any tidal model supported by
-#     `pyTMD`, including the FES2014 Finite Element Solution
-#     tide model, and the TPXO8-atlas and TPXO9-atlas-v5
-#     TOPEX/POSEIDON global tide models.
-
-#     This function requires access to tide model data files
-#     to work. These should be placed in a folder with
-#     subfolders matching the formats specified by `pyTMD`:
-#     https://pytmd.readthedocs.io/en/latest/getting_started/Getting-Started.html#directories
-
-#     For FES2014 (https://www.aviso.altimetry.fr/es/data/products/auxiliary-products/global-tide-fes/description-fes2014.html):
-#         - {directory}/fes2014/ocean_tide/
-#           {directory}/fes2014/load_tide/
-
-#     For TPXO8-atlas (https://www.tpxo.net/tpxo-products-and-registration):
-#         - {directory}/tpxo8_atlas/
-
-#     For TPXO9-atlas-v5 (https://www.tpxo.net/tpxo-products-and-registration):
-#         - {directory}/TPXO9_atlas_v5/
-
-#     This function is a minor modification of the `pyTMD`
-#     package's `compute_tide_corrections` function, adapted
-#     to process multiple timesteps for multiple input point
-#     locations. For more info:
-#     https://pytmd.readthedocs.io/en/stable/user_guide/compute_tide_corrections.html
-
-#     Parameters:
-#     -----------
-#     x, y : float or list of floats
-#         One or more x and y coordinates used to define
-#         the location at which to model tides. By default these
-#         coordinates should be lat/lon; use `epsg` if they
-#         are in a custom coordinate reference system.
-#     time : A datetime array or pandas.DatetimeIndex
-#         An array containing 'datetime64[ns]' values or a
-#         'pandas.DatetimeIndex' providing the times at which to
-#         model tides in UTC time.
-#     model : string
-#         The tide model used to model tides. Options include:
-#         - FES2014
-#         - TPXO8-atlas
-#         - TPXO9-atlas-v5
-#     directory : string
-#         The directory containing tide model data files. These
-#         data files should be stored in sub-folders for each
-#         model that match the structure provided by `pyTMD`:
-#         https://pytmd.readthedocs.io/en/latest/getting_started/Getting-Started.html#directories
-#         For example:
-#         - {directory}/fes2014/ocean_tide/
-#           {directory}/fes2014/load_tide/
-#         - {directory}/tpxo8_atlas/
-#         - {directory}/TPXO9_atlas_v5/
-#     epsg : int
-#         Input coordinate system for 'x' and 'y' coordinates.
-#         Defaults to 4326 (WGS84).
-#     method : string
-#         Method used to interpolate tidal contsituents
-#         from model files. Options include:
-#         - bilinear: quick bilinear interpolation
-#         - spline: scipy bivariate spline interpolation
-#         - linear, nearest: scipy regular grid interpolations
-#     extrapolate : bool
-#         Whether to extrapolate tides for locations outside of
-#         the tide modelling domain using nearest-neighbor
-#     cutoff : int or float
-#         Extrapolation cutoff in kilometers. Set to `np.inf`
-#         to extrapolate for all points.
-
-#     Returns
-#     -------
-#     A pandas.DataFrame containing tide heights for every
-#     combination of time and point coordinates.
-#     """
-#     import os
-#     import pyproj
-#     import numpy as np
-#     import pyTMD.time
-#     import pyTMD.model
-#     import pyTMD.utilities
-#     from pyTMD.calc_delta_time import calc_delta_time
-#     from pyTMD.infer_minor_corrections import infer_minor_corrections
-#     from pyTMD.predict_tide_drift import predict_tide_drift
-#     from pyTMD.read_tide_model import extract_tidal_constants
-#     from pyTMD.read_netcdf_model import extract_netcdf_constants
-#     from pyTMD.read_GOT_model import extract_GOT_constants
-#     from pyTMD.read_FES_model import extract_FES_constants
-
-#     # Check that tide directory is accessible
-#     try:
-#         os.access(directory, os.F_OK)
-#     except:
-#         raise FileNotFoundError("Invalid tide directory")
-
-#     # Get parameters for tide model
-#     model = pyTMD.model(directory, format="netcdf", compressed=False).elevation(model)
-
-#     # If time passed as a single Timestamp, convert to datetime64
-#     if isinstance(time, pd.Timestamp):
-#         time = time.to_datetime64()
-
-#     # Handle numeric or array inputs
-#     x = np.atleast_1d(x)
-#     y = np.atleast_1d(y)
-#     time = np.atleast_1d(time)
-
-#     # Determine point and time counts
-#     assert len(x) == len(y), "x and y must be the same length"
-#     n_points = len(x)
-#     n_times = len(time)
-
-#     # Converting x,y from EPSG to latitude/longitude
-#     try:
-#         # EPSG projection code string or int
-#         crs1 = pyproj.CRS.from_string("epsg:{0:d}".format(int(epsg)))
-#     except (ValueError, pyproj.exceptions.CRSError):
-#         # Projection SRS string
-#         crs1 = pyproj.CRS.from_string(epsg)
-
-#     crs2 = pyproj.CRS.from_string("epsg:{0:d}".format(4326))
-#     transformer = pyproj.Transformer.from_crs(crs1, crs2, always_xy=True)
-#     lon, lat = transformer.transform(x.flatten(), y.flatten())
-
-#     # Assert delta time is an array and convert datetime
-#     time = np.atleast_1d(time)
-#     t = pyTMD.time.convert_datetime(time, epoch=(1992, 1, 1, 0, 0, 0)) / 86400.0
-
-#     # Delta time (TT - UT1) file
-#     delta_file = pyTMD.utilities.get_data_path(["data", "merged_deltat.data"])
-
-#     # Read tidal constants and interpolate to grid points
-#     if model.format in ("OTIS", "ATLAS"):
-#         amp, ph, D, c = extract_tidal_constants(
-#             lon,
-#             lat,
-#             model.grid_file,
-#             model.model_file,
-#             model.projection,
-#             TYPE=model.type,
-#             METHOD=method,
-#             EXTRAPOLATE=extrapolate,
-#             CUTOFF=cutoff,
-#             GRID=model.format,
-#         )
-#         deltat = np.zeros_like(t)
-
-#     elif model.format == "netcdf":
-#         amp, ph, D, c = extract_netcdf_constants(
-#             lon,
-#             lat,
-#             model.grid_file,
-#             model.model_file,
-#             TYPE=model.type,
-#             METHOD=method,
-#             EXTRAPOLATE=extrapolate,
-#             CUTOFF=cutoff,
-#             SCALE=model.scale,
-#             GZIP=model.compressed,
-#         )
-#         deltat = np.zeros_like(t)
-
-#     elif model.format == "GOT":
-#         amp, ph, c = extract_GOT_constants(
-#             lon,
-#             lat,
-#             model.model_file,
-#             METHOD=method,
-#             EXTRAPOLATE=extrapolate,
-#             CUTOFF=cutoff,
-#             SCALE=model.scale,
-#             GZIP=model.compressed,
-#         )
-
-#         # Interpolate delta times from calendar dates to tide time
-#         deltat = calc_delta_time(delta_file, t)
-
-#     elif model.format == "FES":
-#         amp, ph = extract_FES_constants(
-#             lon,
-#             lat,
-#             model.model_file,
-#             TYPE=model.type,
-#             VERSION=model.version,
-#             METHOD=method,
-#             EXTRAPOLATE=extrapolate,
-#             CUTOFF=cutoff,
-#             SCALE=model.scale,
-#             GZIP=model.compressed,
-#         )
-
-#         # Available model constituents
-#         c = model.constituents
-
-#         # Interpolate delta times from calendar dates to tide time
-#         deltat = calc_delta_time(delta_file, t)
-
-#     # Calculate complex phase in radians for Euler's
-#     cph = -1j * ph * np.pi / 180.0
-
-#     # Calculate constituent oscillation
-#     hc = amp * np.exp(cph)
-
-#     # Repeat constituents to length of time and number of input
-#     # coords before passing to `predict_tide_drift`
-#     t, hc, deltat = (
-#         np.tile(t, n_points),
-#         hc.repeat(n_times, axis=0),
-#         np.tile(deltat, n_points),
-#     )
-
-#     # Predict tidal elevations at time and infer minor corrections
-#     npts = len(t)
-#     tide = np.ma.zeros((npts), fill_value=np.nan)
-#     tide.mask = np.any(hc.mask, axis=1)
-#     tide.data[:] = predict_tide_drift(t, hc, c, deltat=deltat, corrections=model.format)
-#     minor = infer_minor_corrections(t, hc, c, deltat=deltat, corrections=model.format)
-#     tide.data[:] += minor.data[:]
-
-#     # Replace invalid values with fill value
-#     tide.data[tide.mask] = tide.fill_value
-
-#     # Export data as a dataframe
-#     return pd.DataFrame(
-#         {
-#             "time": np.tile(time, n_points),
-#             "x": np.repeat(x, n_times),
-#             "y": np.repeat(y, n_times),
-#             "tide_m": tide,
-#         }
-#     ).set_index("time")
-
-
-# def model_tide_points(
-#     ds,
-#     points_gdf,
-#     extent_buffer=0.05,
-#     tide_model="FES2014",
-#     directory="/var/share",
-# ):
-#     """
-#     Takes an xarray.Dataset (`ds`), extracts a subset of tide modelling
-#     points from a geopandas.GeoDataFrame based on`ds`'s extent, then
-#     uses the `model_tides` function based on `pyTMD` to model tide
-#     heights for every point at every time step in `ds`.
-
-#     The output is a geopandas.GeoDataFrame with a "time" index
-#     (matching the time steps in `ds`), and a "tide_m" column giving the
-#     tide heights at each point location.
-
-#     Parameters:
-#     -----------
-#     ds : xarray.Dataset
-#         An `xarray.Dataset` containing a time series of water index
-#         data (e.g. MNDWI) for the provided datacube query.
-#     points_gdf : geopandas.GeoDataFrame
-#         A `geopandas.GeoDataFrame` containing spatial points used to
-#         model tides.
-#     extent_buffer : float, optional
-#         A float giving the extent in degrees to buffer the satellite
-#         imagery dataset (`ds`) when selecting spatial points used
-#         to model tides. This buffer creates overlap between analysis
-#         areas, which ensures that modelled tides are seamless when
-#         clipped back to the dataset extent in a subsequent step.
-#     tide_model : string
-#         The tide model used to model tides. Options include:
-#         - FES2014
-#         - TPXO8-atlas
-#         - TPXO9-atlas-v5
-#     directory : string
-#         The directory containing tide model data files. These
-#         data files should be stored in sub-folders for each
-#         model that match the structure provided by `pyTMD`:
-#         https://pytmd.readthedocs.io/en/latest/getting_started/Getting-Started.html#directories
-#         For example:
-#         - {directory}/fes2014/ocean_tide/
-#           {directory}/fes2014/load_tide/
-#         - {directory}/tpxo8_atlas/
-#         - {directory}/TPXO9_atlas_v5/
-
-#     Returns:
-#     --------
-#     tidepoints_gdf : geopandas.GeoDataFrame
-#         An `geopandas.GeoDataFrame` containing modelled tide heights
-#         with an index based on each timestep in `ds`.
-#     """
-
-#     # Obtain extent of loaded data, and buffer to ensure that tides
-#     # are modelled reliably and comparably across grid tiles
-#     ds_extent = shape(ds.geobox.geographic_extent.json)
-#     buffered = ds_extent.buffer(extent_buffer)
-#     subset_gdf = points_gdf[points_gdf.geometry.intersects(buffered)]
-
-#     # Extract lon, lat from tides, and time from satellite data
-#     x_vals = subset_gdf.geometry.x.tolist()
-#     y_vals = subset_gdf.geometry.y.tolist()
-#     observed_datetimes = ds.time.data.astype("M8[s]").astype("O").tolist()
-
-#     # Model tides for each coordinate and time
-#     tidepoints_df = model_tides(
-#         x=x_vals, y=y_vals, time=ds.time.values, directory=directory, model=tide_model
-#     )
-
-#     # Convert data to spatial geopandas.GeoDataFrame
-#     tidepoints_gdf = gpd.GeoDataFrame(
-#         data={"time": tidepoints_df.index, "tide_m": tidepoints_df.tide_m},
-#         geometry=gpd.points_from_xy(tidepoints_df.x, tidepoints_df.y),
-#         crs="EPSG:4326",
-#     )
-
-#     # Reproject to satellite data CRS
-#     tidepoints_gdf = tidepoints_gdf.to_crs(crs=ds.crs)
-
-#     # Fix time and set to index
-#     tidepoints_gdf["time"] = pd.to_datetime(tidepoints_gdf["time"], utc=True)
-#     tidepoints_gdf = tidepoints_gdf.set_index("time")
-
-#     return tidepoints_gdf
-
-
-# def interpolate_tide(timestep, tidepoints_gdf, method="rbf", factor=50):
-#     """
-#     Extract a subset of tide modelling point data for a given time-step,
-#     then interpolate these tides into the extent of the xarray dataset.
-
-#     Parameters:
-#     -----------
-#     timestep_tuple : tuple
-#         A tuple of x, y and time values sourced from `ds`. These values
-#         are used to set up the x and y grid into which tide heights for
-#         each timestep are interpolated. For example:
-#         `(ds.x.values, ds.y.values, ds.time.values)`
-#     tidepoints_gdf : geopandas.GeoDataFrame
-#         An `geopandas.GeoDataFrame` containing modelled tide heights
-#         with an index based on each timestep in `ds`.
-#     method : string, optional
-#         The method used to interpolate between point values. This string
-#         is either passed to `scipy.interpolate.griddata` (for 'linear',
-#         'nearest' and 'cubic' methods), or used to specify Radial Basis
-#         Function interpolation using `scipy.interpolate.Rbf` ('rbf').
-#         Defaults to 'rbf'.
-#     factor : int, optional
-#         An optional integer that can be used to subsample the spatial
-#         interpolation extent to obtain faster interpolation times, then
-#         up-sample this array back to the original dimensions of the
-#         data as a final step. For example, setting `factor=10` will
-#         interpolate ata into a grid that has one tenth of the
-#         resolution of `ds`. This approach will be significantly faster
-#         than interpolating at full resolution, but will potentially
-#         produce less accurate or reliable results.
-
-#     Returns:
-#     --------
-#     out_tide : xarray.DataArray
-#         A 2D array containing tide heights interpolated into the extent
-#         of the input data.
-#     """
-
-#     # Extract subset of observations based on timestamp of imagery
-#     time_string = str(timestep.time.values)[0:19].replace("T", " ")
-#     tidepoints_subset = tidepoints_gdf.loc[time_string]
-
-#     # Get lists of x, y and z (tide height) data to interpolate
-#     x_coords = tidepoints_subset.geometry.x.values.astype("float32")
-#     y_coords = tidepoints_subset.geometry.y.values.astype("float32")
-#     z_coords = tidepoints_subset.tide_m.values.astype("float32")
-
-#     # Interpolate tides into the extent of the satellite timestep
-#     out_tide = interpolate_2d(
-#         ds=timestep,
-#         x_coords=x_coords,
-#         y_coords=y_coords,
-#         z_coords=z_coords,
-#         method=method,
-#         factor=factor,
-#     )
-
-#     # Return data as a Float32 to conserve memory
-#     return out_tide.astype("float32")
 
 
 def tide_cutoffs(ds, tides_lowres, tide_centre=0.0, resampling="bilinear"):
@@ -801,12 +305,8 @@ def tide_cutoffs(ds, tides_lowres, tide_centre=0.0, resampling="bilinear"):
     tide_cutoff_max = tide_centre + tide_cutoff_buffer
 
     # Reproject into original geobox
-    tide_cutoff_min = tide_cutoff_min.odc.reproject(
-        ds.odc.geobox, resampling=resampling
-    )
-    tide_cutoff_max = tide_cutoff_max.odc.reproject(
-        ds.odc.geobox, resampling=resampling
-    )
+    tide_cutoff_min = tide_cutoff_min.odc.reproject(ds.odc.geobox, resampling=resampling)
+    tide_cutoff_max = tide_cutoff_max.odc.reproject(ds.odc.geobox, resampling=resampling)
 
     return tide_cutoff_min, tide_cutoff_max
 
@@ -872,9 +372,7 @@ def load_tidal_subset(year_ds, tide_cutoff_min, tide_cutoff_max):
 
     # Determine what pixels were acquired in selected tide range, and
     # drop time-steps without any relevant pixels to reduce data to load
-    tide_bool = (year_ds.tide_m >= tide_cutoff_min) & (
-        year_ds.tide_m <= tide_cutoff_max
-    )
+    tide_bool = (year_ds.tide_m >= tide_cutoff_min) & (year_ds.tide_m <= tide_cutoff_max)
     year_ds = year_ds.sel(time=tide_bool.sum(dim=["x", "y"]) > 0)
 
     # Apply mask, and load in corresponding tide masked data
@@ -882,9 +380,7 @@ def load_tidal_subset(year_ds, tide_cutoff_min, tide_cutoff_max):
     return year_ds.compute()
 
 
-def tidal_composite(
-    year_ds, label, label_dim, output_dir, output_suffix="", export_geotiff=False
-):
+def tidal_composite(year_ds, label, label_dim, output_dir, output_suffix="", export_geotiff=False):
     """
     For a given year of data, takes median, counts and standard
     deviationo of valid water index results, and optionally writes
@@ -923,9 +419,7 @@ def tidal_composite(
 
     # Compute median water indices and counts of valid pixels
     median_ds = year_ds.median(dim="time", keep_attrs=True)
-    median_ds["count"] = year_ds.mndwi.count(dim="time", keep_attrs=True).astype(
-        "int16"
-    )
+    median_ds["count"] = year_ds.mndwi.count(dim="time", keep_attrs=True).astype("int16")
     median_ds["stdev"] = year_ds.mndwi.std(dim="time", keep_attrs=True)
 
     # Set nodata values
@@ -1025,9 +519,7 @@ def export_annual_gapfill(ds, output_dir, tide_cutoff_min, tide_cutoff_max):
         future_ds = []
 
 
-def generate_rasters(
-    dc, config, study_area, raster_version, start_year, end_year, log=None
-):
+def generate_rasters(dc, config, study_area, raster_version, start_year, end_year, log=None):
     #####################################
     # Connect to datacube, Dask cluster #
     #####################################
@@ -1047,9 +539,7 @@ def generate_rasters(
 
     # Grid cells used to process the analysis
     gridcell_gdf = (
-        gpd.read_file(config["Input files"]["grid_path"])
-        .to_crs(epsg=4326)
-        .set_index("id")
+        gpd.read_file(config["Input files"]["grid_path"]).to_crs(epsg=4326).set_index("id")
     )
     gridcell_gdf.index = gridcell_gdf.index.astype(int).astype(str)
     gridcell_gdf = gridcell_gdf.loc[[str(study_area)]]
@@ -1098,18 +588,14 @@ def generate_rasters(
     # calculate tide cutoffs used to restrict our data to satellite
     # observations centred over mid-tide (0 m Above Mean Sea Level).
     tide_cutoff_min, tide_cutoff_max = tide_cutoffs(ds, tides_lowres, tide_centre=0.0)
-    log.info(
-        f"Study area {study_area}: Calculating low and high tide cutoffs for each pixel"
-    )
+    log.info(f"Study area {study_area}: Calculating low and high tide cutoffs for each pixel")
 
     ##############################
     # Generate yearly composites #
     ##############################
 
     # If output folder doesn't exist, create it
-    output_dir = (
-        f"data/interim/raster/{raster_version}/" f"{study_area}_{raster_version}"
-    )
+    output_dir = f"data/interim/raster/{raster_version}/" f"{study_area}_{raster_version}"
     os.makedirs(output_dir, exist_ok=True)
 
     # Iterate through each year and export annual and 3-year
@@ -1186,8 +672,7 @@ def generate_rasters(
     "--overwrite/--no-overwrite",
     type=bool,
     default=True,
-    help="Whether to overwrite tiles with existing outputs, "
-    "or skip these tiles entirely.",
+    help="Whether to overwrite tiles with existing outputs, " "or skip these tiles entirely.",
 )
 def generate_rasters_cli(
     config_path,
@@ -1207,9 +692,7 @@ def generate_rasters_cli(
 
     # Skip if outputs exist but overwrite is False
     if output_exists and not overwrite:
-        log.info(
-            f"Study area {study_area}: Data exists but overwrite set to False; skipping."
-        )
+        log.info(f"Study area {study_area}: Data exists but overwrite set to False; skipping.")
         sys.exit(0)
 
     # Connect to datacube
