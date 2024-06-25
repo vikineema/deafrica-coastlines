@@ -13,12 +13,43 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 requires-python = ">=3.9"
-dynamic = ["version", "dependencies"]
+dependencies = [
+    "aiohttp",
+    "affine",
+    "botocore",
+    "click",
+    "datacube",
+    "deafrica_tools",
+    "dea_tools",
+    "Fiona",
+    "geopandas",
+    "matplotlib",
+    "mock",
+    "numpy",
+    "odc-geo",
+    "odc_ui",
+    "pandas",
+    "pygeos",
+    "pyproj",
+    "pyTMD",
+    "python-geohash",
+    "pytz",
+    "PyYAML",
+    "rasterio",
+    "setuptools-scm",
+    "scikit_image",
+    "scikit_learn",
+    "scipy",
+    "shapely",
+    "tqdm",
+    "xarray",
+]
+dynamic = ["version"]
 
 [project.urls]
 Repository = "https://github.com/digitalearthafrica/deafrica-coastlines.git"
 "Bug Tracker" = "https://github.com/digitalearthafrica/deafrica-coastlines/issues"
-    
+
 [project.scripts]
 deafricacoastlines-raster = "coastlines.raster:generate_rasters_cli"
 deafricacoastlines-vector = "coastlines.vector:generate_vectors_cli"
