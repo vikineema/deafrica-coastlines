@@ -423,11 +423,8 @@ def tidal_composite(year_ds, label, label_dim, output_dir, output_suffix="", exp
     median_ds["stdev"] = year_ds.mndwi.std(dim="time", keep_attrs=True)
 
     # Set nodata values
-    median_ds["ndwi"].attrs["nodata"] = np.nan
-    median_ds["mndwi"].attrs["nodata"] = np.nan
-    median_ds["tide_m"].attrs["nodata"] = np.nan
-    median_ds["stdev"].attrs["nodata"] = np.nan
-    median_ds["count"].attrs["nodata"] = -999
+    for var_name, var in median_ds.data_vars.items():
+        median_ds[var_name].attrs["nodata"] = -999 if var.dtype == "int16" else np.nan
 
     # Write each variable to file
     if export_geotiff:
