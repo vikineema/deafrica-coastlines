@@ -371,7 +371,6 @@ def certainty_masking(yearly_ds, obs_threshold=5, stdev_threshold=0.25, sieve_si
         vector_mask = xr_vectorize(
             arr,
             crs=yearly_ds.geobox.crs,
-            transform=yearly_ds.geobox.affine,
             attribute_col="certainty",
         )
 
