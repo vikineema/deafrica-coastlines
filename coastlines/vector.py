@@ -1107,7 +1107,9 @@ def contour_certainty(contours_gdf, certainty_masks):
         contour_gdf = contours_gdf.loc[[year]]
 
         # Assign each shoreline segment with attributes from certainty mask
-        contour_gdf = contour_gdf.overlay(certainty_masks[year].reset_index(), how="intersection")
+        contour_gdf = contour_gdf.overlay(
+            certainty_masks[str(year)].reset_index(), how="intersection"
+        )
 
         # Set year field and use as index
         contour_gdf["year"] = year
@@ -1474,9 +1476,9 @@ def generate_vectors(
             points_gdf.country.isin(offshore_island_nations),
             "certainty",
         ] = "offshore islands"
-        points_gdf.loc[
-            rocky_shoreline_flag(points_gdf, geomorphology_gdf), "certainty"
-        ] = "likely rocky coastline"
+        points_gdf.loc[rocky_shoreline_flag(points_gdf, geomorphology_gdf), "certainty"] = (
+            "likely rocky coastline"
+        )
         points_gdf.loc[points_gdf.rate_time.abs() > 200, "certainty"] = "extreme value (> 200 m)"
         points_gdf.loc[points_gdf.angle_std > 30, "certainty"] = "high angular variability"
         points_gdf.loc[points_gdf.valid_obs < 15, "certainty"] = "insufficient observations"
