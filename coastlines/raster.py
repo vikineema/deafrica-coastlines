@@ -53,7 +53,7 @@ from coastlines.utils import configure_logging, load_config
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-# Note: Temporary fix until dea_tools or deafrica_tools is updated.
+# Note: Temporary fix until deafrica_tools is updated.
 def parallel_apply(ds, dim, func, use_threads=False, *args, **kwargs):
     """
     Applies a custom function in parallel along the dimension of an

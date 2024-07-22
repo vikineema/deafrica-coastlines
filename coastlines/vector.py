@@ -33,7 +33,8 @@ from shapely.ops import nearest_points
 from skimage.measure import label, regionprops
 from skimage.morphology import binary_closing, binary_dilation, dilation, disk
 from coastlines.utils import configure_logging, load_config
-from dea_tools.spatial import subpixel_contours, xr_vectorize, xr_rasterize
+from dea_tools.spatial import subpixel_contours
+from deafrica_tools.spatial import xr_vectorize, xr_rasterize
 
 # Hide specific warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
