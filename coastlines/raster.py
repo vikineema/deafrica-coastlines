@@ -45,13 +45,79 @@ from datacube.virtual import catalog_from_file
 from dea_tools.dask import create_local_dask_cluster
 from dea_tools.spatial import interpolate_2d, hillshade, sun_angles
 from dea_tools.coastal import model_tides, pixel_tides
-from dea_tools.datahandling import parallel_apply
+# from dea_tools.datahandling import parallel_apply
 
 from coastlines.utils import configure_logging, load_config
 
 # Hide warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
+
+# Note: Temporary fix until dea_tools or deafrica_tools is updated.
+def parallel_apply(ds, dim, func, use_threads=False, *args, **kwargs):
+    """
+    Applies a custom function in parallel along the dimension of an
+    xarray.Dataset or xarray.DataArray.
+
+    The function can be any function that can be applied to an
+    individual xarray.Dataset or xarray.DataArray (e.g. data for a
+    single timestep). The function should also return data in
+    xarray.Dataset or xarray.DataArray format.
+
+    This function is useful as a simple method for parallising code
+    that cannot easily be parallised using Dask.
+
+    Parameters
+    ----------
+    ds : xarray.Dataset or xarray.DataArray
+        xarray data with a dimension `dim` to apply the custom function
+        along.
+    dim : string
+        The dimension along which the custom function will be applied.
+    func : function
+        The function that will be applied in parallel to each array
+        along dimension `dim`. The first argument passed to this
+        function should be the array along `dim`.
+    use_threads : bool, optional
+        Whether to use threads instead of processes for parallelisation.
+        Defaults to False, which means it'll use multi-processing.
+        In brief, the difference between threads and processes is that threads
+        share memory, while processes have separate memory.
+    *args :
+        Any number of arguments that will be passed to `func`.
+    **kwargs :
+        Any number of keyword arguments that will be passed to `func`.
+
+    Returns
+    -------
+    xarray.Dataset
+        A concatenated dataset containing an output for each array
+        along the input `dim` dimension.
+    """
+
+    from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+    from functools import partial
+    from itertools import repeat
+
+    from tqdm import tqdm
+
+    # Use threads or processes
+    if use_threads:
+        Executor = ThreadPoolExecutor()
+    else:
+        Executor = ProcessPoolExecutor()
+
+    with Executor as executor:
+        # Update func to add kwargs
+        func = partial(func, **kwargs)
+
+        # Apply func in parallel
+        groups = [group for (i, group) in ds.groupby(dim)]
+        to_iterate = (groups, *(repeat(i, len(groups)) for i in args))
+        out_list = list(tqdm(executor.map(func, *to_iterate), total=len(groups)))
+
+    # Combine to match the original dataset
+    return xr.concat(out_list, dim=ds[dim])
 
 # def hillshade(dem, elevation, azimuth, vert_exag=1, dx=30, dy=30):
 #     """
