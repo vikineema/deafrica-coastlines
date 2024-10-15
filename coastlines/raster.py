@@ -44,7 +44,7 @@ from datacube.virtual import catalog_from_file
 
 from dea_tools.dask import create_local_dask_cluster
 from dea_tools.spatial import interpolate_2d, hillshade, sun_angles
-from dea_tools.coastal import model_tides, pixel_tides
+from deafrica_tools.coastal import model_tides, pixel_tides
 
 from coastlines.utils import configure_logging, load_config
 
