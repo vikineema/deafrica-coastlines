@@ -45,7 +45,6 @@ from datacube.virtual import catalog_from_file
 from dea_tools.dask import create_local_dask_cluster
 from dea_tools.spatial import interpolate_2d, hillshade, sun_angles
 from dea_tools.coastal import model_tides, pixel_tides
-# from dea_tools.datahandling import parallel_apply
 
 from coastlines.utils import configure_logging, load_config
 
@@ -53,7 +52,6 @@ from coastlines.utils import configure_logging, load_config
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-# Note: Temporary fix until deafrica_tools is updated.
 def parallel_apply(ds, dim, func, use_threads=False, *args, **kwargs):
     """
     Applies a custom function in parallel along the dimension of an
@@ -112,7 +110,7 @@ def parallel_apply(ds, dim, func, use_threads=False, *args, **kwargs):
         func = partial(func, **kwargs)
 
         # Apply func in parallel
-        groups = [group for (i, group) in ds.groupby(dim)]
+        groups = [group.squeeze(dim=dim) for (i, group) in ds.groupby(dim)]
         to_iterate = (groups, *(repeat(i, len(groups)) for i in args))
         out_list = list(tqdm(executor.map(func, *to_iterate), total=len(groups)))
 
