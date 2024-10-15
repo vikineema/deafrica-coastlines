@@ -1,6 +1,7 @@
-FROM osgeo/gdal:ubuntu-small-3.4.1 as base
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.8.5
 
-ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+ENV CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt \
+    USE_PYGEOS=0
 
 RUN apt-get update \
     && apt-get install -y \
@@ -12,20 +13,16 @@ RUN apt-get update \
     libpq-dev python3-dev \
     # For SSL
     ca-certificates \
+    # Building wheel for shapely
+    libgeos-dev \
     # Tidy up
     && apt-get autoclean && \
     apt-get autoremove && \
     rm -rf /var/lib/{apt,dpkg,cache,log}
 
 COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r /tmp/requirements.txt \
-    --no-binary rasterio \
-    --no-binary shapely \
-    --no-binary fiona \
-    # Extras
-    && pip install --no-cache-dir awscli requests
-
+RUN python -m pip install  --no-cache-dir  --upgrade pip pip-tools
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 RUN mkdir -p /code
 WORKDIR /code
