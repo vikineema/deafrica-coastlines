@@ -360,20 +360,32 @@ def certainty_masking(yearly_ds, obs_threshold=5, stdev_threshold=0.25, sieve_si
     raster_mask = (
         high_stdev.where(~low_obs, 2)
         .groupby("year")
-        .apply(lambda x: sieve(x.values.astype(np.int16), size=sieve_size))
+        .apply(
+            lambda x: xr.DataArray(
+                sieve(
+                    x.squeeze(dim="year").values.astype(np.int16), size=sieve_size
+                ).reshape(x.shape),
+                dims=x.dims,
+                coords=x.coords,
+            )
+        )
     )
 
     # Apply greyscale dilation to expand masked pixels to err on
     # the side of overclassifying certainty issues
     raster_mask = raster_mask.groupby("year").apply(
-        lambda x: dilation(x.values, disk(3))
+        lambda x: xr.DataArray(
+            dilation(x.squeeze(dim="year").values, disk(3)).reshape(x.shape),
+            dims=x.dims,
+            coords=x.coords,
+        )
     )
 
     # Loop through each mask and vectorise
     vector_masks = {}
     for i, arr in raster_mask.groupby("year"):
         vector_mask = xr_vectorize(
-            arr,
+            arr.squeeze(dim="year"),
             crs=yearly_ds.geobox.crs,
             attribute_col="certainty",
         )
@@ -1015,9 +1027,9 @@ def calculate_regressions(points_gdf, contours_gdf):
         ),
         axis=1,
     )
-    points_gdf[
-        ["rate_time", "incpt_time", "sig_time", "se_time", "outl_time"]
-    ] = rate_out
+    points_gdf[["rate_time", "incpt_time", "sig_time", "se_time", "outl_time"]] = (
+        rate_out
+    )
 
     # Copy slope and intercept into points_subset so they can be
     # used to temporally de-trend annual distances
@@ -1515,15 +1527,15 @@ def generate_vectors(
         points_gdf.loc[
             rocky_shoreline_flag(points_gdf, geomorphology_gdf), "certainty"
         ] = "likely rocky coastline"
-        points_gdf.loc[
-            points_gdf.rate_time.abs() > 200, "certainty"
-        ] = "extreme value (> 200 m)"
-        points_gdf.loc[
-            points_gdf.angle_std > 30, "certainty"
-        ] = "high angular variability"
-        points_gdf.loc[
-            points_gdf.valid_obs < 15, "certainty"
-        ] = "insufficient observations"
+        points_gdf.loc[points_gdf.rate_time.abs() > 200, "certainty"] = (
+            "extreme value (> 200 m)"
+        )
+        points_gdf.loc[points_gdf.angle_std > 30, "certainty"] = (
+            "high angular variability"
+        )
+        points_gdf.loc[points_gdf.valid_obs < 15, "certainty"] = (
+            "insufficient observations"
+        )
 
         # Generate a geohash UID for each point and set as index
         uids = (
