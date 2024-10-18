@@ -594,7 +594,7 @@ def contours_preprocess(
         (thresholded_ds != 0)  # Set both 1s and NaN to True
         .where(~inland_mask, 1)
         .groupby("year")
-        .apply(lambda x: ocean_masking(x, tide_points_gdf, 1, 3))
+        .apply(lambda x: ocean_masking(x.squeeze(dim="year"), tide_points_gdf, 1, 3))
     )
 
     # Keep pixels within annual mask layers, all time coastal buffer,
